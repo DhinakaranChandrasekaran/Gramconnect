@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: gramconnect-backend
+
+  data:
+    mongodb:
+      uri: mongodb+srv://dhinakaran1845:QAs5x6mK7RK4hA36@gramconnect.3cvlsqc.mongodb.net/?retryWrites=true&w=majority&appName=GramConnect
+      database: gramconnect
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: gramconnectofficial@gmail.com
+    password: xnvjjvucxfzfkxkk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  port: 8080
+
+jwt:
+  secret: GramConnectSecretKey2024ForSmartVillageSystem
+  expiration: 86400000  # 24 hours in milliseconds
+
+otp:
+  expiration: 300000  # 5 minutes in milliseconds
+  max-attempts: 3
+
+twofactor:
+  api-key: 6bb44564-7040-11f0-a562-0200cd936042
+
+logging:
+  level:
+    com.gramconnect: DEBUG

@@ -1,0 +1,308 @@
+package com.gramconnect.service;
+
+import com.gramconnect.dto.AuthRequest;
+import com.gramconnect.dto.AuthResponse;
+import com.gramconnect.dto.OtpRequest;
+import com.gramconnect.model.User;
+import com.gramconnect.model.Admin;
+import com.gramconnect.model.OtpVerification;
+import com.gramconnect.repository.UserRepository;
+import com.gramconnect.repository.AdminRepository;
+import com.gramconnect.repository.OtpVerificationRepository;
+import com.gramconnect.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.Random;
+
+@Service
+public class AuthService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
+    private OtpVerificationRepository otpRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private SmsService smsService;
+
+    public AuthResponse register(AuthRequest request) {
+        if (request.getEmail() != null && userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("User with this email already exists");
+        }
+        if (request.getPhoneNumber() != null && userRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+            throw new RuntimeException("User with this phone number already exists");
+        }
+
+        User user = new User();
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setDistrict(request.getDistrict());
+        user.setPanchayat(request.getPanchayat());
+        user.setWard(request.getWard());
+        user.setHomeAddress(request.getHomeAddress());
+        user.setAadhaarNumber(request.getAadhaarNumber());
+        user.setAadhaarVerified(request.isAadhaarVerified());
+
+        if (request.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        if (request.getAuthType() == AuthRequest.AuthType.PHONE_OTP) {
+            String otp = generateOtp();
+            OtpVerification.OtpType otpType = OtpVerification.OtpType.PHONE_REGISTRATION;
+            saveOtp(request.getPhoneNumber(), otp, otpType);
+            // TEMP: Disable actual SMS sending and just log OTP
+            System.out.println("[PHONE OTP - REGISTER] OTP for " + request.getPhoneNumber() + ": " + otp);
+
+            user.setActive(false);
+            user = userRepository.save(user);
+
+            AuthResponse response = new AuthResponse();
+            response.setUserId(user.getId());
+            response.setRequiresOtpVerification(true);
+            response.setMessage("OTP sent to " + request.getPhoneNumber() + ". Please verify to complete registration.");
+            return response;
+        }
+
+        user.setActive(true);
+        user = userRepository.save(user);
+
+        try {
+            if (user.getEmail() != null) {
+                emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
+            }
+            if (user.getPhoneNumber() != null) {
+                smsService.sendWelcomeSms(user.getPhoneNumber(), user.getFullName());
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send welcome messages: " + e.getMessage());
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), "USER");
+        AuthResponse response = new AuthResponse(token, user.getId(), user.getFullName(), "USER");
+        response.setEmail(user.getEmail());
+        response.setPhoneNumber(user.getPhoneNumber());
+        response.setDistrict(user.getDistrict());
+        response.setPanchayat(user.getPanchayat());
+        response.setWard(user.getWard());
+        response.setHomeAddress(user.getHomeAddress());
+        response.setAadhaarNumber(user.getAadhaarNumber());
+        response.setAadhaarVerified(user.isAadhaarVerified());
+        response.setExpiresAt(LocalDateTime.now().plusDays(1));
+        return response;
+    }
+
+    public AuthResponse login(AuthRequest request) {
+        Optional<User> userOpt = request.getEmail() != null ? 
+            userRepository.findByEmail(request.getEmail()) : 
+            userRepository.findByPhoneNumber(request.getPhoneNumber());
+
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("User not found");
+        }
+
+        User user = userOpt.get();
+
+        if (!user.isActive()) {
+            throw new RuntimeException("Account not activated. Please verify your OTP.");
+        }
+
+        if (request.getAuthType() == AuthRequest.AuthType.PHONE_OTP || 
+            request.getAuthType() == AuthRequest.AuthType.EMAIL_OTP) {
+
+            String identifier = request.getEmail() != null ? request.getEmail() : request.getPhoneNumber();
+            String otp = generateOtp();
+            OtpVerification.OtpType otpType = request.getEmail() != null ? 
+                OtpVerification.OtpType.EMAIL_LOGIN : OtpVerification.OtpType.PHONE_LOGIN;
+
+            saveOtp(identifier, otp, otpType);
+
+            if (request.getEmail() != null) {
+                emailService.sendOtp(user.getEmail(), otp);
+            } else {
+                // TEMP: Disable actual SMS sending and just log OTP
+                System.out.println("[PHONE OTP - LOGIN] OTP for " + user.getPhoneNumber() + ": " + otp);
+            }
+
+            AuthResponse response = new AuthResponse();
+            response.setUserId(user.getId());
+            response.setRequiresOtpVerification(true);
+            response.setMessage("OTP sent to " + identifier + ". Please verify to complete login.");
+            return response;
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
+        }
+
+        try {
+            if (user.getEmail() != null) {
+                emailService.sendLoginWelcomeEmail(user.getEmail(), user.getFullName());
+            }
+            if (user.getPhoneNumber() != null) {
+                smsService.sendLoginWelcomeSms(user.getPhoneNumber(), user.getFullName());
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send login welcome messages: " + e.getMessage());
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), "USER");
+
+        AuthResponse response = new AuthResponse(token, user.getId(), user.getFullName(), "USER");
+        response.setEmail(user.getEmail());
+        response.setPhoneNumber(user.getPhoneNumber());
+        response.setDistrict(user.getDistrict());
+        response.setPanchayat(user.getPanchayat());
+        response.setWard(user.getWard());
+        response.setHomeAddress(user.getHomeAddress());
+        response.setAadhaarNumber(user.getAadhaarNumber());
+        response.setAadhaarVerified(user.isAadhaarVerified());
+        response.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        return response;
+    }
+
+    public AuthResponse adminLogin(AuthRequest request) {
+        Optional<Admin> adminOpt = adminRepository.findByEmail(request.getEmail());
+        if (adminOpt.isEmpty()) {
+            throw new RuntimeException("Admin not found");
+        }
+        Admin admin = adminOpt.get();
+        if (!passwordEncoder.matches(request.getPassword(), admin.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
+        }
+        String token = jwtUtil.generateToken(admin.getId(), "ADMIN");
+        AuthResponse response = new AuthResponse(token, admin.getId(), admin.getFullName(), "ADMIN");
+        response.setEmail(admin.getEmail());
+        response.setExpiresAt(LocalDateTime.now().plusDays(1));
+        return response;
+    }
+
+    public AuthResponse verifyOtp(OtpRequest request) {
+        String identifier = request.getIdentifier();
+        Optional<OtpVerification> otpOpt = otpRepository.findByIdentifierAndTypeAndVerifiedFalse(
+            identifier, request.getType());
+
+        if (otpOpt.isEmpty()) {
+            throw new RuntimeException("Invalid or expired OTP");
+        }
+
+        OtpVerification otpVerification = otpOpt.get();
+
+        if (otpVerification.isExpired()) {
+            throw new RuntimeException("OTP has expired");
+        }
+
+        if (!otpVerification.getOtp().equals(request.getOtp())) {
+            otpVerification.setAttempts(otpVerification.getAttempts() + 1);
+            otpRepository.save(otpVerification);
+            if (otpVerification.getAttempts() >= 3) {
+                otpRepository.delete(otpVerification);
+                throw new RuntimeException("Too many failed attempts. Please request a new OTP.");
+            }
+            throw new RuntimeException("Invalid OTP");
+        }
+
+        otpVerification.setVerified(true);
+        otpRepository.save(otpVerification);
+
+        Optional<User> userOpt = identifier.contains("@") ? 
+            userRepository.findByEmail(identifier) : 
+            userRepository.findByPhoneNumber(identifier);
+
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("User not found");
+        }
+
+        User user = userOpt.get();
+        if (request.getType() == OtpVerification.OtpType.EMAIL_REGISTRATION || 
+            request.getType() == OtpVerification.OtpType.PHONE_REGISTRATION) {
+            user.setActive(true);
+            userRepository.save(user);
+            try {
+                if (user.getEmail() != null) {
+                    emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
+                }
+                if (user.getPhoneNumber() != null) {
+                    smsService.sendWelcomeSms(user.getPhoneNumber(), user.getFullName());
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to send welcome messages after OTP: " + e.getMessage());
+            }
+        }
+
+        if (request.getType() == OtpVerification.OtpType.EMAIL_LOGIN || 
+            request.getType() == OtpVerification.OtpType.PHONE_LOGIN) {
+            try {
+                if (user.getEmail() != null) {
+                    emailService.sendLoginWelcomeEmail(user.getEmail(), user.getFullName());
+                }
+                if (user.getPhoneNumber() != null) {
+                    smsService.sendLoginWelcomeSms(user.getPhoneNumber(), user.getFullName());
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to send login welcome messages after OTP: " + e.getMessage());
+            }
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), "USER");
+        AuthResponse response = new AuthResponse(token, user.getId(), user.getFullName(), "USER");
+        response.setEmail(user.getEmail());
+        response.setPhoneNumber(user.getPhoneNumber());
+        response.setDistrict(user.getDistrict());
+        response.setPanchayat(user.getPanchayat());
+        response.setWard(user.getWard());
+        response.setHomeAddress(user.getHomeAddress());
+        response.setAadhaarNumber(user.getAadhaarNumber());
+        response.setAadhaarVerified(user.isAadhaarVerified());
+        response.setExpiresAt(LocalDateTime.now().plusDays(1));
+        return response;
+    }
+
+    public void resendOtp(String identifier, OtpVerification.OtpType type) {
+        long count = otpRepository.countByIdentifierAndType(identifier, type);
+        if (count >= 3) {
+            throw new RuntimeException("Maximum OTP requests exceeded. Please try again later.");
+        }
+
+        otpRepository.deleteByIdentifierAndType(identifier, type);
+
+        String otp = generateOtp();
+        saveOtp(identifier, otp, type);
+
+        if (identifier.contains("@")) {
+            emailService.sendOtp(identifier, otp);
+        } else {
+            // TEMP: Disable actual SMS sending and just log OTP
+            System.out.println("[RESEND OTP - PHONE] OTP for " + identifier + ": " + otp);
+        }
+    }
+
+    private String generateOtp() {
+        Random random = new Random();
+        return String.format("%06d", random.nextInt(1000000));
+    }
+
+    private void saveOtp(String identifier, String otp, OtpVerification.OtpType type) {
+        OtpVerification otpVerification = new OtpVerification(identifier, otp, type);
+        otpRepository.save(otpVerification);
+    }
+}
