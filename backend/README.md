@@ -1,0 +1,351 @@
+# 🔶 GramConnect - Civic Issues Management System
+
+A comprehensive full-stack mobile-first application for villages to report and manage civic issues, track garbage collection schedules, and handle administrative tasks with offline-first capabilities.
+
+## 🎯 Features
+
+### Core Functionality
+- **Multi-Authentication**: Google Sign-In, Phone OTP, Email OTP, Password, Aadhaar (mock)
+- **Issue Reporting**: Report civic issues with image upload and GPS location
+- **Status Tracking**: Real-time complaint status with automatic 24-hour reminders
+- **Garbage Management**: View collection schedules and report missed pickups
+- **Admin Dashboard**: Comprehensive management for admins and super admins
+- **Offline Support**: Offline-first architecture with automatic sync
+- **Push Notifications**: Real-time updates for status changes
+
+### User Roles
+- **USER**: Report issues, view schedules, track complaints
+- **ADMIN**: Manage complaints, schedules, users in assigned regions
+- **SUPER_ADMIN**: Full system access, create/manage admins
+
+## 🧱 Tech Stack
+
+### Backend
+- **Framework**: Spring Boot 3.x with Java 21
+- **Build Tool**: Maven
+- **Database**: MongoDB Atlas (Cloud)
+- **Authentication**: JWT with role-based access
+- **Email**: Gmail SMTP for OTP delivery
+
+### Frontend  
+- **Framework**: Flutter 3.32.8 (Dart 3.8.1)
+- **UI**: Material 3 Design System
+- **Local Database**: MongoDB Realm (realm-dart)
+- **Notifications**: flutter_local_notifications
+- **State Management**: Provider/Riverpod
+
+## 📦 Project Structure
+
+```
+gramconnect/
+├── backend/                    # Spring Boot Backend
+│   ├── src/main/java/com/gramconnect/
+│   │   ├── GramConnectApplication.java
+│   │   ├── config/            # Configuration classes
+│   │   ├── controller/        # REST Controllers
+│   │   ├── service/           # Business Logic
+│   │   ├── repository/        # Data Access Layer
+│   │   ├── model/            # Entity Models
+│   │   ├── dto/              # Data Transfer Objects
+│   │   ├── security/         # Security Configuration
+│   │   └── util/             # Utility Classes
+│   ├── src/main/resources/
+│   │   ├── application.yml
+│   │   └── application-dev.yml
+│   ├── pom.xml
+│   └── README.md
+├── frontend/                  # Flutter Frontend
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── core/             # Core functionality
+│   │   ├── features/         # Feature modules
+│   │   ├── services/         # API and business services
+│   │   ├── widgets/          # Reusable widgets
+│   │   └── utils/            # Utilities
+│   ├── assets/               # Images, fonts, etc.
+│   ├── android/              # Android configuration
+│   ├── ios/                  # iOS configuration
+│   ├── pubspec.yaml
+│   └── README.md
+├── docs/                     # Documentation
+├── postman/                  # API Collection
+└── scripts/                  # Setup scripts
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Java 21+
+- Maven 3.6+
+- Flutter 3.32.8+ with Dart 3.8.1+
+- MongoDB Atlas account
+- Gmail account for SMTP
+
+### Backend Setup
+
+1. **Clone and navigate to backend**:
+   ```bash
+   cd backend
+   ```
+
+2. **Configure environment variables** (create `application-dev.yml`):
+   ```yaml
+   spring:
+     data:
+       mongodb:
+         uri: ${MONGODB_URI:mongodb+srv://username:password@cluster.mongodb.net/gramconnect}
+     mail:
+       host: smtp.gmail.com
+       port: 587
+       username: ${GMAIL_USERNAME:your-email@gmail.com}
+       password: ${GMAIL_APP_PASSWORD:your-app-password}
+       properties:
+         mail:
+           smtp:
+             auth: true
+             starttls:
+               enable: true
+   
+   jwt:
+     secret: ${JWT_SECRET:your-jwt-secret-key-here}
+     expiration: 86400000
+   
+   app:
+     environment: dev
+   ```
+
+3. **Run the application**:
+   ```bash
+   ./mvnw spring-boot:run
+   ```
+
+4. **Seed Super Admin** (one-time setup):
+   ```bash
+   curl -X POST http://localhost:8080/api/admins/seed \
+     -H "Content-Type: application/json" \
+     -d '{"email":"admin@gramconnect.com","password":"Admin@123"}'
+   ```
+
+### Frontend Setup
+
+1. **Navigate to frontend**:
+   ```bash
+   cd frontend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   flutter pub get
+   ```
+
+3. **Configure environment** (create `lib/core/config/env.dart`):
+   ```dart
+   class Environment {
+     static const String baseUrl = 'http://10.0.2.2:8080/api'; // Android emulator
+     // static const String baseUrl = 'http://localhost:8080/api'; // iOS simulator
+     static const bool isDevelopment = true;
+   }
+   ```
+
+4. **Run the application**:
+   ```bash
+   flutter run
+   ```
+
+## 🔐 Authentication Flow
+
+### Development Mode
+- **Phone OTP**: Generated by backend, logged in terminal, displayed in app SnackBar
+- **Email OTP**: Sent via Gmail SMTP + logged in terminal
+- **Aadhaar OTP**: Mock generated by backend, logged in terminal
+
+### OTP Security Features
+- 6-digit numeric OTP with 5-minute expiry
+- 60-second resend cooldown with UI countdown
+- Max 3 resends per session (429 error after limit)
+- Max 3 failed verifications → 10-15 minute block
+- Rate limiting on all OTP endpoints
+
+## 📊 MongoDB Collections
+
+### Core Collections
+- **users**: User profiles and authentication data
+- **admins**: Admin accounts with regional assignments
+- **complaints**: Issue reports with status tracking
+- **garbageSchedules**: Collection schedules by region
+- **missedPickups**: Missed pickup reports
+- **notifications**: Push notifications and alerts
+- **otpLogs**: OTP tracking and security logs
+- **locations**: Geographic hierarchy (district→panchayat→village→ward)
+
+## 🔌 API Endpoints
+
+### Authentication & OTP
+```
+POST /api/auth/signup          # Create new user account
+POST /api/auth/login           # Password/email login
+POST /api/auth/google          # Google Sign-In verification
+POST /api/auth/otp/generate    # Generate OTP (phone/email)
+POST /api/auth/otp/verify      # Verify OTP
+POST /api/auth/otp/resend      # Resend OTP with cooldown
+POST /api/auth/aadhaar/generate # Generate Aadhaar OTP
+POST /api/auth/aadhaar/verify   # Verify Aadhaar OTP
+```
+
+### User Management
+```
+GET /api/users/me              # Get current user profile
+PUT /api/users/me              # Update user profile
+POST /api/users/change-password # Change password
+```
+
+### Complaints
+```
+POST /api/complaints           # Submit new complaint
+GET /api/complaints/user       # Get user's complaints
+GET /api/complaints/{id}       # Get complaint details
+PATCH /api/complaints/{id}/status # Update complaint status (admin)
+POST /api/complaints/{id}/feedback # Submit user feedback
+POST /api/complaints/{id}/reminder # Send reminder
+```
+
+### Garbage Management
+```
+GET /api/schedules            # Get garbage collection schedules
+POST /api/schedules           # Create schedule (admin)
+PUT /api/schedules/{id}       # Update schedule (admin)
+DELETE /api/schedules/{id}    # Delete schedule (admin)
+POST /api/missed-pickups      # Report missed pickup
+GET /api/missed-pickups/my    # Get user's missed pickup reports
+GET /api/missed-pickups       # Get all missed pickups (admin)
+PATCH /api/missed-pickups/{id}/status # Update missed pickup status
+```
+
+### Admin Management
+```
+POST /api/admins/seed         # Create super admin (one-time)
+POST /api/admins              # Create admin (super admin only)
+GET /api/admins               # List admins (super admin only)
+PUT /api/admins/{id}          # Update admin (super admin only)
+DELETE /api/admins/{id}       # Delete admin (super admin only)
+```
+
+### Notifications
+```
+GET /api/notifications        # Get user notifications
+PATCH /api/notifications/{id}/read # Mark notification as read
+POST /api/notifications/send  # Send notification (admin/system)
+```
+
+## 🧪 Testing
+
+### Backend Testing
+```bash
+./mvnw test
+```
+
+### Frontend Testing
+```bash
+flutter test
+```
+
+### API Testing
+Import the Postman collection from `postman/GramConnect.postman_collection.json`
+
+## 🌐 Offline Capabilities
+
+### Frontend Offline Features
+- **Draft Storage**: Save complaint drafts in Realm when offline
+- **Queue Operations**: Queue API calls for when connection is restored
+- **Data Caching**: Cache schedules, notifications, and location data
+- **Sync Status**: Visual indicators for sync status
+- **Conflict Resolution**: Timestamp-based conflict resolution
+
+## 🔄 Development Workflow
+
+### OTP Testing in Development
+1. Start backend with `app.environment=dev`
+2. Check terminal logs for generated OTPs
+3. OTPs also appear in API response body for SnackBar display
+4. Use Postman collection for API testing
+
+### Adding New Features
+1. **Backend**: Create model → repository → service → controller → DTO
+2. **Frontend**: Create service → UI → state management → navigation
+3. **Test**: Unit tests → integration tests → manual testing
+
+## 🚢 Deployment
+
+### Backend Deployment
+- Package: `./mvnw clean package`
+- Deploy JAR to cloud platform (Heroku, AWS, GCP)
+- Set production environment variables
+- Configure MongoDB Atlas whitelist
+
+### Frontend Deployment
+- Build APK: `flutter build apk --release`
+- Build iOS: `flutter build ios --release`
+- Deploy to Google Play Store / Apple App Store
+
+## 📚 Additional Resources
+
+### MongoDB Schema Design
+See `docs/database-schema.md` for detailed collection structures
+
+### API Documentation
+Access Swagger UI at: `http://localhost:8080/swagger-ui.html`
+
+### Flutter Architecture
+See `frontend/README.md` for detailed architecture patterns
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+1. **MongoDB Connection**: Verify Atlas cluster IP whitelist and connection string
+2. **Gmail SMTP**: Ensure App Password is generated and 2FA is enabled
+3. **Flutter Build**: Check Dart/Flutter version compatibility
+4. **OTP Not Received**: Check backend terminal logs for generated OTPs
+5. **Realm Sync**: Verify internet connection and Realm configuration
+
+### Development Tips
+- Use `flutter logs` to see real-time device logs
+- Enable verbose logging in development mode
+- Use MongoDB Compass for database inspection
+- Test with Android emulator IP: `10.0.2.2:8080`
+- Test with iOS simulator IP: `localhost:8080`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push branch: `git push origin feature/new-feature`
+5. Create Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see LICENSE file for details.
+
+---
+
+## 🔶 ORIGINAL PROMPT for Recreation
+
+To recreate this entire project structure in Bolt.new or Cursor, use this prompt:
+
+```
+# 🔶 GOLDEN PROMPT — GramConnect (Full Stack Specification)
+## 🎯 Objective
+Build a full-stack, mobile-first system for villages to:
+- Report civic issues (garbage, water, electricity, drainage, road damage, health/transport)
+- Track complaint status and send reminders after 24 hours
+- View garbage collection schedules and report missed pickups
+- Manage users, admins, feedback, and schedules
+- Support offline-first usage (automatic sync when online)
+- use flutter (.dart files) for frontend dont use realm files and all use pure flutter .dart files
+- use java (.java files) for backend
+
+[... include the complete original prompt here ...]
+```
+
+This README provides complete setup instructions, API documentation, and the original prompt for project recreation.

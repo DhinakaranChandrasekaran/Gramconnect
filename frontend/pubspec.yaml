@@ -1,0 +1,103 @@
+name: gramconnect
+description: A civic issues management system for villages
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.32.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI and Material Design
+  material_color_utilities: ^0.11.1
+
+  # State Management
+  provider: ^6.1.1
+
+  # Networking
+  http: ^1.1.2
+  dio: ^5.4.0
+
+  # Local Storage
+  shared_preferences: ^2.2.2
+
+  # Local Database (Alternative to Realm for now)
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # Authentication
+  google_sign_in: ^6.1.6
+
+  # Location Services
+  geolocator: ^10.1.0
+  permission_handler: ^11.1.0
+
+  # Image Handling
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
+
+  # Notifications
+  flutter_local_notifications: ^16.3.0
+
+  # Internationalization
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
+  # UI Components
+  flutter_svg: ^2.0.9
+  lottie: ^2.7.0
+
+  # Utilities
+  uuid: ^4.2.1
+  path_provider: ^2.1.2
+  connectivity_plus: ^5.0.2
+
+  # Development
+  json_annotation: ^4.8.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto/static/Roboto-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/Roboto/static/Roboto-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Roboto/static/Roboto-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto/static/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto/static/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto/static/Roboto-Black.ttf
+          weight: 900
+        - asset: assets/fonts/Roboto/static/Roboto-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Roboto/static/Roboto-BoldItalic.ttf
+          weight: 700
+          style: italic
+
+flutter_intl:
+  enabled: true
+  arb_dir: lib/l10n
+  output_dir: lib/generated
+  use_deferred_loading: false

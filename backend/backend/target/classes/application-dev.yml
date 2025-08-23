@@ -1,0 +1,20 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb+srv://dhinakaran1845:QAs5x6mK7RK4hA36@gramconnect.3cvlsqc.mongodb.net/?retryWrites=true&w=majority&appName=GramConnect
+      database: gram_connect
+  
+  mail:
+    username: gramconnectofficial@gmail.com
+    password: xnvjjvucxfzfkxkk
+
+jwt:
+  secret: GramConnectSecretKey2024ForSmartVillageSystem
+  
+app:
+  environment: dev
+
+logging:
+  level:
+    com.gramconnect: DEBUG
+    org.springframework.mail: DEBUG
